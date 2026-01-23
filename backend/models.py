@@ -39,6 +39,9 @@ class CrawlResult(BaseModel):
     infection_points: float = 0.0
     emergency_points: float = 0.0
     fire_safety_points: float = 0.0
+    
+    # Total Points (Calculated)
+    total_points: float = 0.0
 
     # List of detailed course records
     courses: List[CourseRecord] = []
