@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+playwright
+pandas
+openpyxl
+beautifulsoup4
+httpx
+python-multipart
+aiofiles
