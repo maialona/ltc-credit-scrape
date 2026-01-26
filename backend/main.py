@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 import pandas as pd
 import io
 import asyncio
@@ -46,9 +47,17 @@ app.add_middleware(
 
 crawler = LtcCrawler(headless=True)
 
-@app.get("/")
-def read_root():
-    return {"status": "ok", "service": "LTC Credit Crawler"}
+# Serve Static Files
+frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
+
+# API routes are defined above this. 
+# Anything that isn't an API route will be handled by the static files/React Router.
+if os.path.exists(frontend_path):
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="static")
+else:
+    @app.get("/")
+    def read_root():
+        return {"status": "ok", "service": "LTC Credit Crawler (Static files not found)"}
 
 @app.post("/api/crawl/single")
 async def crawl_single(request: CrawlRequest):

@@ -16,10 +16,11 @@ if sys.platform == 'win32':
 from backend.main import app
 
 if __name__ == "__main__":
-    print("Starting Uvicorn...")
+    port = int(os.environ.get("PORT", 8000))
+    print(f"Starting Uvicorn on port {port}...")
     uvicorn.run(
         app, 
-        host="127.0.0.1", 
-        port=8000, 
+        host="0.0.0.0", 
+        port=port, 
         log_level="info"
     )

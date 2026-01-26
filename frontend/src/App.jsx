@@ -541,7 +541,7 @@ export default function App() {
                  </div>
                  <div className="flex-1 w-full space-y-1.5">
                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">出生年月日</label>
-                   <input type="text" value={dob} onChange={(e) => setDob(e.target.value)} placeholder="085/01/01" className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-slate-900 placeholder-slate-400 transition-all outline-none font-medium" required />
+                   <input type="text" value={dob} onChange={(e) => setDob(e.target.value)} placeholder="090/01/01" className="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-slate-900 placeholder-slate-400 transition-all outline-none font-medium" required />
                  </div>
                  <button type="submit" disabled={loading} className="w-full md:w-auto px-8 py-3 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl shadow-lg shadow-slate-900/20 hover:shadow-xl transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 transform active:scale-95">
                    {loading ? <Loader2 className="animate-spin h-5 w-5" /> : <><Search size={18} /> 查詢</>}
