@@ -21,10 +21,12 @@ class LtcCrawler:
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self.browser:
+        if hasattr(self, 'browser') and self.browser:
             await self.browser.close()
-        if self.playwright:
+            self.browser = None
+        if hasattr(self, 'playwright') and self.playwright:
             await self.playwright.stop()
+            self.playwright = None
 
     async def solve_captcha_2captcha(self, api_key: str, image_bytes: bytes) -> str:
         """

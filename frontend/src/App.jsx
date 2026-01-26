@@ -616,23 +616,23 @@ export default function App() {
              </div>
              
              {/* Column Headers (Sortable) */}
-             <div className="px-6 py-3 bg-slate-50 text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-5 border-b border-white whitespace-nowrap">
+             <div className="px-6 py-3 bg-slate-50 text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-5 border-b border-white">
                  <div className="w-10"></div>
                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-x-8 flex-1">
-                      <div className="cursor-pointer hover:text-teal-600 flex items-center gap-1 whitespace-nowrap" onClick={() => handleSort('emp_id')}>
-                          員工編號 <SortIcon column="emp_id" />
+                      <div className="cursor-pointer hover:text-teal-600 flex items-center gap-1 flex-nowrap shrink-0" onClick={() => handleSort('emp_id')}>
+                          <span className="whitespace-nowrap">員工編號</span> <SortIcon column="emp_id" />
                       </div>
-                      <div className="cursor-pointer hover:text-teal-600 flex items-center gap-1 whitespace-nowrap" onClick={() => handleSort('name')}>
-                          姓名 <SortIcon column="name" />
+                      <div className="cursor-pointer hover:text-teal-600 flex items-center gap-1 flex-nowrap shrink-0" onClick={() => handleSort('name')}>
+                          <span className="whitespace-nowrap">姓名</span> <SortIcon column="name" />
                       </div>
-                      <div className="cursor-pointer hover:text-teal-600 flex items-center gap-1 whitespace-nowrap" onClick={() => handleSort('organization')}>
-                          機構 <SortIcon column="organization" />
+                      <div className="cursor-pointer hover:text-teal-600 flex items-center gap-1 flex-nowrap shrink-0" onClick={() => handleSort('organization')}>
+                          <span className="whitespace-nowrap">機構</span> <SortIcon column="organization" />
                       </div>
-                      <div className="hidden lg:block cursor-pointer hover:text-teal-600 flex items-center gap-1 whitespace-nowrap" onClick={() => handleSort('valid_period')}>
-                          有效期限 <SortIcon column="valid_period" />
+                      <div className="hidden lg:flex cursor-pointer hover:text-teal-600 items-center gap-1 flex-nowrap shrink-0" onClick={() => handleSort('valid_period')}>
+                          <span className="whitespace-nowrap">有效期限</span> <SortIcon column="valid_period" />
                       </div>
-                      <div className="cursor-pointer hover:text-teal-600 flex items-center gap-1 whitespace-nowrap" onClick={() => handleSort('total_points')}>
-                          總積分 <SortIcon column="total_points" />
+                      <div className="cursor-pointer hover:text-teal-600 flex items-center gap-1 flex-nowrap shrink-0" onClick={() => handleSort('total_points')}>
+                          <span className="whitespace-nowrap">總積分</span> <SortIcon column="total_points" />
                       </div>
                  </div>
                  <div className="w-9"></div>
