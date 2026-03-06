@@ -26,6 +26,9 @@ COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 # Expose Port
 EXPOSE 8000
 
+# Create data directory for SQLite (mount as persistent volume on Zeabur)
+RUN mkdir -p /app/data
+
 # Environment Variables
 ENV HEADLESS=true
 ENV PYTHONUNBUFFERED=1

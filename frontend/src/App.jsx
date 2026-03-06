@@ -10,7 +10,10 @@ import {
   AlertCircle,
   Loader2,
   Menu,
-  X
+  X,
+  Download,
+  Clock,
+  Trash2
 } from 'lucide-react';
 
 /* --- Components --- */
@@ -52,14 +55,91 @@ const Navbar = ({ mode, setMode }) => {
            >
              整批查詢
            </button>
+           <button 
+             onClick={() => setMode('history')}
+             className={`px-4 py-2 text-sm font-semibold rounded-md transition-all duration-200 ${mode === 'history' ? 'bg-white text-teal-700 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
+           >
+             歷史紀錄
+           </button>
         </div>
       </div>
     </nav>
   );
 };
 
+
+const checkCompliance = (data) => {
+  const r = data.raw_data || {};
+  const checks = [];
+
+  // 1. Professional: 品質+倫理+法規 >= 24, capped at 36
+  const qualTotal = (r.qual_physical || 0) + (r.qual_online || 0);
+  const ethicTotal = (r.ethic_physical || 0) + (r.ethic_online || 0);
+  const lawTotal = (r.law_physical || 0) + (r.law_online || 0);
+  const profSubTotal = qualTotal + ethicTotal + lawTotal;
+  const profCapped = Math.min(profSubTotal, 36);
+  checks.push({
+    id: 'professional',
+    label: '專業品質/倫理/法規',
+    pass: profSubTotal >= 24,
+    current: profSubTotal,
+    required: 24,
+    note: profSubTotal > 36 ? `超過 36 點，以 36 點計 (${profSubTotal})` : null,
+    detail: `品質 ${qualTotal} + 倫理 ${ethicTotal} + 法規 ${lawTotal} = ${profSubTotal} 點`
+  });
+
+  // 2. Special categories: each > 0 AND total >= 10
+  const fire = r.fire_safety || 0;
+  const emergency = r.emergency || 0;
+  const infection = r.infection || 0;
+  const gender = r.gender || 0;
+  const specialTotal = fire + emergency + infection + gender;
+  const allTopicsDone = fire > 0 && emergency > 0 && infection > 0 && gender > 0;
+  const missingTopics = [];
+  if (fire === 0) missingTopics.push('消防安全');
+  if (emergency === 0) missingTopics.push('緊急應變');
+  if (infection === 0) missingTopics.push('感染管制');
+  if (gender === 0) missingTopics.push('性別敏感度');
+  checks.push({
+    id: 'special',
+    label: '特定族群課程',
+    pass: allTopicsDone && specialTotal >= 10,
+    current: specialTotal,
+    required: 10,
+    note: !allTopicsDone ? `尚缺: ${missingTopics.join('、')}` : null,
+    detail: `消防 ${fire} + 緊急 ${emergency} + 感染 ${infection} + 性別 ${gender} = ${specialTotal} 點`
+  });
+
+  // 3. Indigenous/Cultural: legacy >= 2
+  const legacy = r.indigenous_legacy || 0;
+  checks.push({
+    id: 'indigenous',
+    label: '原住民族/多元文化',
+    pass: legacy >= 2,
+    current: legacy,
+    required: 2,
+    detail: `113年6月2日前累計 ${legacy} 點`
+  });
+
+  // 4. Total points >= 120
+  const totalPoints = data.total_points || 0;
+  checks.push({
+    id: 'total',
+    label: '總積分',
+    pass: totalPoints >= 120,
+    current: totalPoints,
+    required: 120,
+    detail: `總計 ${totalPoints} 點`
+  });
+
+  const allPass = checks.every(c => c.pass);
+  return { checks, allPass };
+};
+
+
 const DetailView = ({ data }) => {
   const r = data.raw_data || {};
+  const compliance = checkCompliance(data);
   const specialTotal = (r.fire_safety || 0) + (r.emergency || 0) + (r.infection || 0) + (r.gender || 0);
 
   const SectionHeader = ({ title, sub }) => (
@@ -99,6 +179,40 @@ const DetailView = ({ data }) => {
 
   return (
     <div className="p-6 bg-slate-50/50 rounded-b-xl border-t border-gray-100 animate-in fade-in slide-in-from-top-2 duration-300">
+
+      {/* Compliance Summary */}
+      <div className={`rounded-xl border-2 p-5 mb-6 ${compliance.allPass ? 'bg-emerald-50/50 border-emerald-200' : 'bg-amber-50/50 border-amber-200'}`}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className={`p-2 rounded-full ${compliance.allPass ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+            {compliance.allPass ? <CheckCircle size={24} /> : <AlertCircle size={24} />}
+          </div>
+          <div>
+            <div className="font-bold text-lg">{compliance.allPass ? '✅ 符合換證標準' : '⚠️ 尚未符合換證標準'}</div>
+            <div className="text-xs text-slate-500 mt-0.5">
+              {compliance.checks.filter(c => c.pass).length} / {compliance.checks.length} 項目通過
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {compliance.checks.map(c => (
+            <div key={c.id} className={`rounded-lg p-3 border ${c.pass ? 'bg-white border-emerald-100' : 'bg-white border-amber-200'}`}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-slate-600">{c.label}</span>
+                <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${c.pass ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {c.pass ? '通過' : '未達標'}
+                </span>
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className={`text-xl font-bold font-mono ${c.pass ? 'text-emerald-600' : 'text-amber-600'}`}>{c.current}</span>
+                <span className="text-xs text-slate-400">/ {c.required} 點</span>
+              </div>
+              {c.note && <div className="text-[10px] text-amber-600 mt-1">⚠ {c.note}</div>}
+              <div className="text-[10px] text-slate-400 mt-0.5">{c.detail}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       
       {/* 1. Professional Courses */}
       <SectionHeader title="專業課程" />
@@ -260,6 +374,153 @@ const DetailView = ({ data }) => {
     </div>
   );
 };
+
+
+const HistoryView = () => {
+  const [records, setRecords] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [searchText, setSearchText] = React.useState('');
+  const [expandedRows, setExpandedRows] = React.useState(new Set());
+
+  const fetchHistory = async (search = '') => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (search) params.set('search', search);
+      const resp = await fetch(`/api/history?${params}`);
+      const data = await resp.json();
+      setRecords(data.results || []);
+    } catch (err) {
+      console.error('Failed to fetch history:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchHistory();
+  }, []);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    fetchHistory(searchText);
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('確定要刪除這筆紀錄嗎？')) return;
+    try {
+      await fetch(`/api/history/${id}`, { method: 'DELETE' });
+      setRecords(prev => prev.filter(r => r.id !== id));
+    } catch (err) {
+      alert('刪除失敗: ' + err.message);
+    }
+  };
+
+  const toggleRow = (index) => {
+    const newSet = new Set(expandedRows);
+    if (newSet.has(index)) newSet.delete(index);
+    else newSet.add(index);
+    setExpandedRows(newSet);
+  };
+
+  return (
+    <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden relative">
+      <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-indigo-400 to-purple-500" />
+      
+      <div className="px-6 py-5 border-b border-gray-100 bg-slate-50/50 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="flex items-center gap-2">
+          <Clock className="text-indigo-500 h-5 w-5" />
+          <h2 className="font-bold text-slate-800">歷史查詢紀錄</h2>
+          <span className="text-xs font-bold px-2.5 py-1 bg-slate-200 text-slate-600 rounded-full">{records.length} 筆</span>
+        </div>
+        
+        <form onSubmit={handleSearch} className="flex items-center gap-2 w-full md:w-auto">
+          <div className="relative flex-1 md:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
+            <input 
+              type="text" 
+              placeholder="搜尋姓名、ID 或機構..." 
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+            />
+          </div>
+          <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-all">
+            搜尋
+          </button>
+        </form>
+      </div>
+
+      {loading ? (
+        <div className="p-12 text-center">
+          <Loader2 className="animate-spin h-8 w-8 mx-auto text-indigo-400 mb-3" />
+          <p className="text-slate-400">載入中...</p>
+        </div>
+      ) : records.length === 0 ? (
+        <div className="p-12 text-center text-slate-400">
+          <Clock className="mx-auto h-12 w-12 text-slate-200 mb-4" />
+          <p>尚無查詢紀錄</p>
+          <p className="text-xs mt-1">查詢結果會自動儲存在這裡</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-100">
+          {records.map((r, i) => (
+            <div key={r.id || i} className="group transition-all hover:bg-slate-50/50">
+              <div 
+                className={`px-6 py-4 flex items-center justify-between cursor-pointer transition-all border-l-4 ${expandedRows.has(i) ? 'border-indigo-500 bg-indigo-50/10' : 'border-transparent'}`}
+              >
+                <div className="flex items-center gap-4 flex-1 min-w-0" onClick={() => toggleRow(i)}>
+                  <div className="p-2 rounded-full bg-indigo-100 text-indigo-600 flex-shrink-0">
+                    <Clock size={18} />
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-x-6 gap-y-2 flex-1 min-w-0">
+                    <div className="min-w-0">
+                      <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-0.5 md:hidden">姓名</div>
+                      <div className="font-bold text-slate-900 truncate">{r.name || '-'}</div>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-0.5 md:hidden">機構</div>
+                      <div className="text-slate-600 truncate">{r.organization || '-'}</div>
+                    </div>
+                    <div className="min-w-0 hidden md:block">
+                      <div className="text-sm text-slate-600">{r.valid_period || '-'}</div>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-0.5 md:hidden">總積分</div>
+                      <div className="font-bold text-indigo-600 font-mono text-lg leading-none">{r.total_points}</div>
+                    </div>
+                    <div className="min-w-0 hidden md:block">
+                      <div className="text-xs text-slate-400">{r.queried_at ? new Date(r.queried_at).toLocaleString('zh-TW') : '-'}</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDelete(r.id); }}
+                    className="p-1.5 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100"
+                    title="刪除"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                  <div className={`text-slate-300 transition-transform duration-300 ${expandedRows.has(i) ? 'rotate-180 text-indigo-500' : ''}`} onClick={() => toggleRow(i)}>
+                    <ChevronDown size={20} />
+                  </div>
+                </div>
+              </div>
+              
+              {expandedRows.has(i) && (
+                <div className="border-t border-gray-100 animate-in slide-in-from-top-2 fade-in duration-300">
+                  <DetailView data={r} />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 export default function App() {
   // Custom Hook for Persistence
@@ -519,8 +780,15 @@ export default function App() {
            >
              整批查詢
            </button>
+           <button 
+             onClick={() => setMode('history')}
+             className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${mode === 'history' ? 'bg-teal-50 text-teal-700 shadow-sm' : 'text-slate-500'}`}
+           >
+             歷史紀錄
+           </button>
         </div>
 
+        {mode === 'history' ? <HistoryView /> : (<>
         {/* Input Card */}
         <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden relative">
           <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-teal-400 to-emerald-500" />
@@ -550,7 +818,12 @@ export default function App() {
             ) : (
                <form onSubmit={handleBatchSubmit} className="flex flex-col md:flex-row gap-5 items-end">
                   <div className="flex-1 w-full space-y-1.5">
+                      <div className="flex items-center justify-between">
                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">上傳 Excel 檔案</label>
+                        <a href="/api/template/download" className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-600 hover:text-teal-700 transition-colors">
+                          <Download size={14} /> 下載範本
+                        </a>
+                      </div>
                      <div className="relative group">
                         <div className="absolute inset-0 bg-gradient-to-r from-teal-500 to-emerald-500 rounded-xl opacity-0 group-hover:opacity-10 transition-opacity pointer-events-none" />
                         <input type="file" onChange={(e) => setFile(e.target.files[0])} className="block w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 transition-all cursor-pointer" accept=".xlsx" />
@@ -613,6 +886,30 @@ export default function App() {
                       />
                    </div>
                </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const resp = await fetch('/api/export/excel', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ results })
+                          });
+                          if (!resp.ok) throw new Error('Export failed');
+                          const blob = await resp.blob();
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = '長照積分查詢結果.xlsx';
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        } catch (err) {
+                          alert('匯出失敗: ' + err.message);
+                        }
+                      }}
+                      className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm hover:shadow transition-all transform active:scale-95"
+                    >
+                      <Download size={16} /> 匯出 Excel
+                    </button>
              </div>
              
              {/* Column Headers (Sortable) */}
@@ -669,6 +966,14 @@ export default function App() {
                            <div className="min-w-0">
                              <div className="md:hidden text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1">總積分</div>
                              <div className="font-bold text-teal-600 font-mono text-lg leading-none">{r.total_points}</div>
+                              {(() => {
+                                const comp = r.status === 'success' ? checkCompliance(r) : null;
+                                return comp ? (
+                                  <span className={`ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${comp.allPass ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                    {comp.allPass ? '✅ 合規' : '⚠️ 未達標'}
+                                  </span>
+                                ) : null;
+                              })()}
                            </div>
                         </div>
                      </div>
@@ -694,6 +999,7 @@ export default function App() {
              </div>
           </div>
         )}
+        </>)}
       </main>
     </div>
   );
