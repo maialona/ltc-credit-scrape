@@ -100,12 +100,13 @@ class LtcCrawler:
             if report_fn: await report_fn(c, t, m)
             
         context = await browser.new_context()
+        context.set_default_timeout(60000)  # 60s default for all actions
         page = await context.new_page()
             
         try:
             logger.info(f"Navigating to {self.BASE_URL}")
             await r(15, 100, "Navigating to LTC website...")
-            await page.goto(self.BASE_URL)
+            await page.goto(self.BASE_URL, timeout=90000, wait_until="domcontentloaded")
             
             # 1. Get Captcha
             await r(25, 100, "Waiting for Captcha...")
