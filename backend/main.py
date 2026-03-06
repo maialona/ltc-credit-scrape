@@ -108,17 +108,6 @@ def save_result_to_db(result_dict: dict):
     finally:
         db.close()
 
-# Serve Static Files
-frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
-
-# API routes are defined above this. 
-# Anything that isn't an API route will be handled by the static files/React Router.
-if os.path.exists(frontend_path):
-    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="static")
-else:
-    @app.get("/")
-    def read_root():
-        return {"status": "ok", "service": "LTC Credit Crawler (Static files not found)"}
 
 @app.post("/api/crawl/single")
 async def crawl_single(request: CrawlRequest):
@@ -534,3 +523,13 @@ def delete_history_record(record_id: int):
         return {"message": "Deleted", "id": record_id}
     finally:
         db.close()
+
+# =================== Static Files (MUST be last) ===================
+# app.mount("/") catches ALL unmatched routes, so it must come AFTER all API routes.
+frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "dist")
+if os.path.exists(frontend_path):
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="static")
+else:
+    @app.get("/")
+    def read_root():
+        return {"status": "ok", "service": "LTC Credit Crawler (Static files not found)"}
