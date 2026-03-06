@@ -1,3 +1,7 @@
+import os
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
@@ -13,13 +17,10 @@ from .models import CrawlRequest, CrawlResult
 from .crawler import LtcCrawler
 from .database import init_db, get_db, SessionLocal
 from .db_models import QueryRecord
-from dotenv import load_dotenv
 import sys
 import json
 from typing import Optional
 from sqlalchemy import desc
-
-load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
 # Fix for Playwright on Windows: Handled in run.py
 # if sys.platform == 'win32':
@@ -507,6 +508,111 @@ def get_history_detail(record_id: int):
         if not record:
             raise HTTPException(status_code=404, detail="Record not found")
         return record.to_dict()
+    finally:
+        db.close()
+
+@app.get("/api/dashboard/stats")
+def get_dashboard_stats():
+    """Get aggregated statistics for the dashboard."""
+    db = SessionLocal()
+    try:
+        # Get all records, sorted by date desc to easily pick the latest
+        all_records = db.query(QueryRecord).order_by(desc(QueryRecord.queried_at)).all()
+        
+        # Deduplicate by idno_masked, keeping only the most recent query per person
+        latest_records = {}
+        for r in all_records:
+            if not r.idno_masked: continue
+            if r.idno_masked not in latest_records:
+                latest_records[r.idno_masked] = r
+                
+        records = list(latest_records.values())
+        total_people = len(records)
+        
+        if total_people == 0:
+            return {
+                "total_people": 0,
+                "pass_count": 0,
+                "fail_count": 0,
+                "avg_points": {
+                    "total": 0, "professional": 0, "special": 0, "indigenous": 0
+                },
+                "missing_stats": {
+                    "professional": 0, "special": 0, "indigenous": 0, "total": 0
+                }
+            }
+
+        pass_count = 0
+        sum_total = 0
+        sum_prof = 0
+        sum_special = 0
+        sum_indig = 0
+        
+        missing_prof = 0
+        missing_special = 0
+        missing_indig = 0
+        missing_total = 0
+
+        import json
+        for r in records:
+            raw = json.loads(r.raw_data_json) if r.raw_data_json else {}
+            
+            # 1. Professional
+            qual = (raw.get('qual_physical', 0) or 0) + (raw.get('qual_online', 0) or 0)
+            ethic = (raw.get('ethic_physical', 0) or 0) + (raw.get('ethic_online', 0) or 0)
+            law = (raw.get('law_physical', 0) or 0) + (raw.get('law_online', 0) or 0)
+            prof_total = qual + ethic + law
+            pass_prof = prof_total >= 24
+
+            # 2. Special
+            fire = raw.get('fire_safety', 0) or 0
+            emerg = raw.get('emergency', 0) or 0
+            infec = raw.get('infection', 0) or 0
+            gend = raw.get('gender', 0) or 0
+            spec_total = fire + emerg + infec + gend
+            pass_spec = (spec_total >= 10) and (fire > 0) and (emerg > 0) and (infec > 0) and (gend > 0)
+
+            # 3. Indigenous
+            legacy = raw.get('indigenous_legacy', 0) or 0
+            pass_indig = legacy >= 2
+
+            # 4. Total points
+            tot_pts = r.total_points or 0
+            pass_tot = tot_pts >= 120
+
+            # Aggregate
+            all_pass = pass_prof and pass_spec and pass_indig and pass_tot
+            if all_pass: pass_count += 1
+            else:
+                if not pass_prof: missing_prof += 1
+                if not pass_spec: missing_special += 1
+                if not pass_indig: missing_indig += 1
+                if not pass_tot: missing_total += 1
+
+            sum_total += tot_pts
+            sum_prof += prof_total
+            sum_special += spec_total
+            sum_indig += legacy
+
+        fail_count = total_people - pass_count
+
+        return {
+            "total_people": total_people,
+            "pass_count": pass_count,
+            "fail_count": fail_count,
+            "avg_points": {
+                "total": round(sum_total / total_people, 1),
+                "professional": round(sum_prof / total_people, 1),
+                "special": round(sum_special / total_people, 1),
+                "indigenous": round(sum_indig / total_people, 1)
+            },
+            "missing_stats": {
+                "professional": missing_prof,
+                "special": missing_special,
+                "indigenous": missing_indig,
+                "total": missing_total
+            }
+        }
     finally:
         db.close()
 

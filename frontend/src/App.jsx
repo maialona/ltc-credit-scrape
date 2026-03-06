@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
 import { 
   Search, 
   Upload, 
@@ -60,6 +61,12 @@ const Navbar = ({ mode, setMode }) => {
              className={`px-4 py-2 text-sm font-semibold rounded-md transition-all duration-200 ${mode === 'history' ? 'bg-white text-teal-700 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
            >
              歷史紀錄
+           </button>
+           <button 
+             onClick={() => setMode('dashboard')}
+             className={`px-4 py-2 text-sm font-semibold rounded-md transition-all duration-200 ${mode === 'dashboard' ? 'bg-white text-teal-700 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
+           >
+             統計報表
            </button>
         </div>
       </div>
@@ -522,6 +529,140 @@ const HistoryView = () => {
 };
 
 
+
+const DashboardView = () => {
+  const [stats, setStats] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const resp = await fetch('/api/dashboard/stats');
+        const data = await resp.json();
+        setStats(data);
+      } catch (err) {
+        console.error('Failed to fetch stats:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/60 p-12 text-center">
+        <Loader2 className="animate-spin h-8 w-8 mx-auto text-indigo-400 mb-3" />
+        <p className="text-slate-400">載入統計數據中...</p>
+      </div>
+    );
+  }
+
+  if (!stats || stats.total_people === 0) {
+    return (
+      <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/60 p-12 text-center">
+        <PieChartIcon className="mx-auto h-12 w-12 text-slate-200 mb-4" />
+        <p className="text-slate-400">尚無足夠數據產生報表</p>
+      </div>
+    );
+  }
+
+  const passRate = Math.round((stats.pass_count / stats.total_people) * 100);
+  
+  const pieData = [
+    { name: '合規 (Pass)', value: stats.pass_count, color: '#10b981' },
+    { name: '未達標 (Fail)', value: stats.fail_count, color: '#f59e0b' }
+  ];
+
+  const barData = [
+    { name: '專業(品質/倫理/法規)', count: stats.missing_stats.professional },
+    { name: '特定(消防/感控/性別/應變)', count: stats.missing_stats.special },
+    { name: '原住民/多元文化', count: stats.missing_stats.indigenous },
+    { name: '總積分(不足120)', count: stats.missing_stats.total },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Cards Row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm">
+          <div className="text-slate-500 text-sm font-medium mb-1">總查詢人數</div>
+          <div className="text-3xl font-bold text-slate-800">{stats.total_people}</div>
+        </div>
+        <div className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm relative overflow-hidden">
+          <div className="absolute right-0 top-0 bottom-0 w-2 bg-emerald-400" />
+          <div className="text-slate-500 text-sm font-medium mb-1">合格人數</div>
+          <div className="text-3xl font-bold text-emerald-600">{stats.pass_count}</div>
+        </div>
+        <div className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm relative overflow-hidden">
+          <div className="absolute right-0 top-0 bottom-0 w-2 bg-amber-400" />
+          <div className="text-slate-500 text-sm font-medium mb-1">未達標人數</div>
+          <div className="text-3xl font-bold text-amber-600">{stats.fail_count}</div>
+        </div>
+        <div className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm">
+          <div className="text-slate-500 text-sm font-medium mb-1">整體合格率</div>
+          <div className="text-3xl font-bold text-indigo-600">{passRate}%</div>
+        </div>
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* Pie Chart */}
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
+          <h3 className="text-lg font-bold text-slate-800 mb-6">合格比例分佈</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={90}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {pieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <RechartsTooltip />
+                <Legend verticalAlign="bottom" height={36}/>
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Bar Chart */}
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
+          <h3 className="text-lg font-bold text-slate-800 mb-6">未達標原因統計</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={barData}
+                layout="vertical"
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" />
+                <YAxis dataKey="name" type="category" width={120} tick={{fontSize: 12}} />
+                <RechartsTooltip />
+                <Bar dataKey="count" fill="#818cf8" radius={[0, 4, 4, 0]}>
+                  {barData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.count > 0 ? '#f43f5e' : '#e2e8f0'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
   // Custom Hook for Persistence
   const usePersistentState = (key, initialValue) => {
@@ -788,7 +929,7 @@ export default function App() {
            </button>
         </div>
 
-        {mode === 'history' ? <HistoryView /> : (<>
+        {mode === 'dashboard' ? <DashboardView /> : mode === 'history' ? <HistoryView /> : (<>
         {/* Input Card */}
         <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden relative">
           <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-teal-400 to-emerald-500" />
