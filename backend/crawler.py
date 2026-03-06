@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import logging
+import os
 from playwright.async_api import async_playwright, Page, BrowserContext
 import httpx
 from .models import CrawlResult
@@ -14,6 +15,9 @@ class LtcCrawler:
 
     def __init__(self, headless: bool = True):
         self.headless = headless
+        # Proxy support for cloud deployments (e.g. PROXY_URL=http://user:pass@host:port)
+        self.proxy_url = os.getenv("PROXY_URL", "")
+        self.max_retries = int(os.getenv("CRAWL_RETRIES", "3"))
 
     async def __aenter__(self):
         self.playwright = await async_playwright().start()
@@ -69,7 +73,7 @@ class LtcCrawler:
 
     async def crawl_single(self, idno: str, dob: str, captcha_key: str, progress_callback=None) -> CrawlResult:
         """
-        Crawls a single record.
+        Crawls a single record with retry logic.
         progress_callback: async function(current: int, total: int, message: str)
         """
         result = CrawlResult(idno=idno, dob=dob, status="failed")
@@ -78,28 +82,53 @@ class LtcCrawler:
              if progress_callback:
                  await progress_callback(cur, tot, msg)
 
-        await report(5, 100, "Initializing Browser...")
-        
-        # Ensure browser is initialized and connected
-        if not hasattr(self, 'browser') or self.browser is None or not self.browser.is_connected():
-             logger.warning("Browser not initialized or disconnected. Launching new instance...")
-             await report(10, 100, "Relaunching Browser...")
-             
-             # Re-initialize Playwright if it was stopped
-             if not hasattr(self, 'playwright') or self.playwright is None:
-                 self.playwright = await async_playwright().start()
-             
-             # Re-launch Browser
-             self.browser = await self.playwright.chromium.launch(headless=self.headless)
+        for attempt in range(1, self.max_retries + 1):
+            if attempt > 1:
+                await report(5, 100, f"Retry {attempt}/{self.max_retries}...")
+                await asyncio.sleep(3)
+            
+            await report(5, 100, "Initializing Browser...")
+            
+            # Ensure browser is initialized and connected
+            if not hasattr(self, 'browser') or self.browser is None or not self.browser.is_connected():
+                 logger.warning("Browser not initialized or disconnected. Launching new instance...")
+                 await report(10, 100, "Relaunching Browser...")
+                 
+                 if not hasattr(self, 'playwright') or self.playwright is None:
+                     self.playwright = await async_playwright().start()
+                 
+                 self.browser = await self.playwright.chromium.launch(headless=self.headless)
 
-        return await self._crawl_with_browser(self.browser, idno, dob, captcha_key, result, report_fn=report)
+            try:
+                result = await self._crawl_with_browser(self.browser, idno, dob, captcha_key, 
+                                                        CrawlResult(idno=idno, dob=dob, status="failed"), 
+                                                        report_fn=report)
+                if result.status == "success":
+                    return result
+                # If failed but not a timeout, don't retry
+                if "Timeout" not in (result.error_message or ""):
+                    return result
+                logger.warning(f"Attempt {attempt} timed out, will retry...")
+            except Exception as e:
+                logger.error(f"Attempt {attempt} error: {e}")
+                result.error_message = str(e)
+                if attempt == self.max_retries:
+                    return result
+        
+        return result
 
     async def _crawl_with_browser(self, browser, idno: str, dob: str, captcha_key: str, result: CrawlResult, report_fn=None) -> CrawlResult:
         # Helper to simplify reporting
         async def r(c, t, m):
             if report_fn: await report_fn(c, t, m)
             
-        context = await browser.new_context()
+        # Add proxy if configured
+        ctx_opts = {}
+        if self.proxy_url:
+            ctx_opts["proxy"] = {"server": self.proxy_url}
+            logger.info(f"Using proxy: {self.proxy_url[:30]}...")
+        
+        context = await browser.new_context(**ctx_opts)
         context.set_default_timeout(60000)  # 60s default for all actions
         page = await context.new_page()
             
