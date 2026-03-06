@@ -8,7 +8,7 @@ RUN npm run build
 
 # Stage 2: Backend & Runtime
 # Use official Playwright image which includes all browser dependencies
-FROM mcr.microsoft.com/playwright/python:v1.57.0-jammy
+FROM mcr.microsoft.com/playwright/python:v1.58.0-jammy
 
 WORKDIR /app
 
