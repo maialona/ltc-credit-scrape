@@ -927,6 +927,12 @@ export default function App() {
            >
              歷史紀錄
            </button>
+           <button 
+             onClick={() => setMode('dashboard')}
+             className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${mode === 'dashboard' ? 'bg-teal-50 text-teal-700 shadow-sm' : 'text-slate-500'}`}
+           >
+             統計報表
+           </button>
         </div>
 
         {mode === 'dashboard' ? <DashboardView /> : mode === 'history' ? <HistoryView /> : (<>
